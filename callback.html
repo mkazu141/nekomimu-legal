@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head><meta charset="utf-8"><title>Nekomimu Uploader - 認可コード</title>
+<style>body{font-family:sans-serif;max-width:680px;margin:60px auto;padding:0 20px;line-height:1.7;color:#222}code{display:block;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;padding:14px;font-size:15px;word-break:break-all;margin:16px 0}button{background:#2563eb;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:14px;cursor:pointer}.ok{color:#059669}</style></head>
+<body>
+<h1>認可コード</h1>
+<p id="msg">URLから認可コードを読み取っています…</p>
+<code id="code">-</code>
+<button onclick="navigator.clipboard.writeText(document.getElementById('code').textContent).then(()=>{document.getElementById('done').textContent='コピーしました。ターミナルに貼り付けてください。'})">コードをコピー</button>
+<p id="done" class="ok"></p>
+<script>
+const p = new URLSearchParams(location.search);
+const c = p.get("code");
+const e = p.get("error");
+if (c) { document.getElementById("code").textContent = c; document.getElementById("msg").textContent = "認可が完了しました。下のコードをコピーして、実行中のターミナルへ貼り付けてください。"; }
+else if (e) { document.getElementById("msg").textContent = "認可がキャンセルまたは失敗しました: " + e; }
+else { document.getElementById("msg").textContent = "コードが見つかりません。認可フローからやり直してください。"; }
+</script>
+</body></html>
