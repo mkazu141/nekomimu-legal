@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nekomimu Uploader — Personal video scheduling tool</title>
+<style>
+ :root{--ink:#0f2747;--ink2:#334155;--muted:#64748b;--blue:#2563eb;--line:#cbd5e1;--pale:#f8fafc;--navy:#142a4d}
+ *{box-sizing:border-box}
+ body{font-family:-apple-system,"Segoe UI","Yu Gothic",sans-serif;color:var(--ink);margin:0;line-height:1.75;background:#fff}
+ header{background:var(--navy);color:#fff;padding:56px 24px}
+ .wrap{max-width:860px;margin:0 auto}
+ header h1{font-size:30px;margin:0 0 8px}
+ header p{color:#cadcfc;margin:0;font-size:15px}
+ main{padding:8px 24px 64px}
+ h2{font-size:20px;margin:44px 0 12px;padding-bottom:8px;border-bottom:2px solid var(--line)}
+ h3{font-size:16px;margin:28px 0 8px;color:var(--blue)}
+ p,li{font-size:14.5px;color:var(--ink2)}
+ code,pre{font-family:Consolas,Menlo,monospace;font-size:13px}
+ pre{background:#12121f;color:#e6e6fa;padding:14px 16px;border-radius:8px;overflow-x:auto}
+ table{border-collapse:collapse;width:100%;margin:12px 0;font-size:14px}
+ th,td{border:1px solid var(--line);padding:9px 12px;text-align:left}
+ th{background:var(--pale)}
+ .note{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px 16px;margin:16px 0;font-size:14px}
+ footer{border-top:1px solid var(--line);padding:24px;font-size:13px;color:var(--muted);text-align:center}
+ a{color:var(--blue)}
+ ul{padding-left:22px}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+ <h1>Nekomimu Uploader</h1>
+ <p>Personal video scheduling tool for a single creator / 個人クリエイター向けの動画予約投稿ツール</p>
+</div></header>
+<main class="wrap">
+
+<h2>Overview / 概要</h2>
+<p>Nekomimu Uploader is a command-line tool that a single creator (the operator) runs on their own Windows PC. It renders short educational videos from local script files and schedules them to the operator's own social media accounts, including TikTok via the Content Posting API. It is not a service for other users: there is no sign-up, no hosting, and no third-party access.</p>
+<p>Nekomimu Uploaderは、運用者本人が自分のWindows PC上で実行するコマンドラインツールです。ローカルの台本ファイルから教育系ショート動画を生成し、運用者自身のアカウント（TikTokはContent Posting API経由）へ予約投稿します。第三者向けのサービスではなく、登録機能もホスティングもありません。</p>
+
+<h2>Features / 機能</h2>
+<table>
+ <tr><th>Feature</th><th>Description</th><th>Command</th></tr>
+ <tr><td>Authorization</td><td>OAuth 2.0 (PKCE) login to the operator's own TikTok account. Tokens are stored locally and refreshed automatically.</td><td><code>npm run auth:tiktok</code></td></tr>
+ <tr><td>Direct Post</td><td>Uploads a local MP4 and publishes it to the operator's profile with the specified privacy level.</td><td><code>npm run tiktok:post -- --story &lt;file&gt;</code></td></tr>
+ <tr><td>Draft upload</td><td>Sends a local MP4 to the TikTok inbox as a draft for manual editing before posting.</td><td><code>npm run tiktok:post -- --story &lt;file&gt; --draft</code></td></tr>
+ <tr><td>Video rendering</td><td>Builds 1080x1920 / 1920x1080 MP4 files from local JSON scripts and local video assets (ffmpeg).</td><td><code>npm run render:batch</code></td></tr>
+ <tr><td>Schedule ledger</td><td>Tracks which videos are planned / scheduled to prevent duplicate posting.</td><td><code>npm run plan:posts</code></td></tr>
+</table>
+
+<h2>How it works / 動作原理</h2>
+<ol>
+ <li><strong>Write a script</strong> — The operator (or an AI assistant) writes a JSON script file describing scenes, on-screen text and the source video assets stored on the local PC.</li>
+ <li><strong>Render</strong> — The tool composes the scenes with ffmpeg into a single MP4 on the local disk. Nothing is uploaded at this stage.</li>
+ <li><strong>Validate</strong> — Resolution, duration, title and publish time are checked automatically. Invalid files are rejected before any API call.</li>
+ <li><strong>Authorize</strong> — On first use, the operator authorizes the app with their own TikTok account via Login Kit (OAuth 2.0 with PKCE, loopback redirect <code>http://localhost:&lt;port&gt;/callback/</code>). The refresh token is stored in a local file that is excluded from version control.</li>
+ <li><strong>Post</strong> — The tool calls <code>/v2/post/publish/video/init/</code> (Direct Post) or <code>/v2/post/publish/inbox/video/init/</code> (draft), uploads the file with a single-chunk PUT, then polls <code>/v2/post/publish/status/fetch/</code> until the status becomes <code>PUBLISH_COMPLETE</code>.</li>
+ <li><strong>Record</strong> — The result (publish id, timestamp) is written to a local ledger file so the same video is never posted twice.</li>
+</ol>
+
+<h3>Example session / 実行例</h3>
+<pre>$ npm run auth:tiktok
+以下のURLをブラウザで開き、投稿先のTikTokアカウントで許可してください:
+https://www.tiktok.com/v2/auth/authorize/?client_key=...&amp;scope=user.info.basic,video.upload,video.publish...
+認可完了。スコープ: user.info.basic,video.publish,video.upload / トークンを保存しました（自動更新されます）
+
+$ npm run tiktok:post -- --story stories/example.json
+投稿: outputs/mov/example.mp4
+タイトル: 会議の文字起こし×AIで先輩のファシリを分解した話 #猫ミーム #AI活用
+公開範囲: SELF_ONLY
+完了: publish_id=v_pub_file~v2-1.76667... status=PUBLISH_COMPLETE</pre>
+
+<h2>Scopes used / 使用スコープ</h2>
+<ul>
+ <li><code>user.info.basic</code> — confirms which account the tool is authorized for (shown in the console after login).</li>
+ <li><code>video.publish</code> — used by the Direct Post flow to publish scheduled videos to the operator's profile.</li>
+ <li><code>video.upload</code> — used by the draft flow (<code>--draft</code>) to send a video to the operator's TikTok inbox for manual editing.</li>
+</ul>
+
+<h2>Data handling / データの扱い</h2>
+<ul>
+ <li>Access and refresh tokens are stored only on the operator's local PC (<code>config/secrets/</code>, excluded from git). They are never transmitted to any third party.</li>
+ <li>Video files are created and stored locally; only the file the operator selects is uploaded to TikTok.</li>
+ <li>No data from other TikTok users is collected, stored, or processed.</li>
+ <li>Access can be revoked at any time from TikTok settings; deleting the local token file removes all stored credentials.</li>
+</ul>
+<div class="note">This tool is used by one person only (the operator). There is no public sign-up page and no login page for other users — the "website" is this documentation.</div>
+
+<h2>Environment / 動作環境</h2>
+<ul>
+ <li>Windows 11 / Node.js 22+ / ffmpeg</li>
+ <li>Run manually from the terminal, or on a schedule via Windows Task Scheduler</li>
+ <li>Posting volume: up to 3 videos per day (well under the API limit of 25/day)</li>
+</ul>
+
+<h2>Legal / 規約</h2>
+<p><a href="./terms.html">Terms of Service / 利用規約</a> ・ <a href="./privacy.html">Privacy Policy / プライバシーポリシー</a></p>
+
+<h2>Contact / 連絡先</h2>
+<p>baske12292323@gmail.com</p>
+</main>
+<footer>Nekomimu Uploader — a personal tool by an individual creator. Last updated: August 2, 2026.</footer>
+</body>
+</html>
